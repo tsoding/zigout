@@ -8,12 +8,15 @@ const FPS = 60;
 const DELTA_TIME_SEC: f32 = 1.0/@intToFloat(f32, FPS);
 const WINDOW_WIDTH = 800;
 const WINDOW_HEIGHT = 600;
+const BACKGROUND_COLOR = 0xFF181818;
 const PROJ_SIZE: f32 = 25*0.80;
-const PROJ_SPEED: f32 = 400;
+const PROJ_SPEED: f32 = 350;
+const PROJ_COLOR = 0xFFFFFFFF;
 const BAR_LEN: f32 = 100;
 const BAR_THICCNESS: f32 = PROJ_SIZE;
 const BAR_Y: f32 = WINDOW_HEIGHT - BAR_THICCNESS - 50;
 const BAR_SPEED: f32 = PROJ_SPEED*1.5;
+const BAR_COLOR = 0xFF3030FF;
 const TARGET_WIDTH = BAR_LEN;
 const TARGET_HEIGHT = BAR_THICCNESS;
 const TARGET_PADDING_X = 20;
@@ -23,6 +26,7 @@ const TARGET_COLS = 5;
 const TARGET_GRID_WIDTH = (TARGET_COLS*TARGET_WIDTH + (TARGET_COLS - 1)*TARGET_PADDING_X);
 const TARGET_GRID_X = WINDOW_WIDTH/2 - TARGET_GRID_WIDTH/2;
 const TARGET_GRID_Y = 50;
+const TARGET_COLOR = 0xFF30FF30;
 
 const Target = struct {
     x: f32,
@@ -65,6 +69,14 @@ fn make_rect(x: f32, y: f32, w: f32, h: f32) c.SDL_Rect {
         .w = @floatToInt(i32, w),
         .h = @floatToInt(i32, h)
     };
+}
+
+fn set_color(renderer: *c.SDL_Renderer, color: u32) void {
+    const r = @truncate(u8, (color >> (0*8)) & 0xFF);
+    const g = @truncate(u8, (color >> (1*8)) & 0xFF);
+    const b = @truncate(u8, (color >> (2*8)) & 0xFF);
+    const a = @truncate(u8, (color >> (3*8)) & 0xFF);
+    _ = c.SDL_SetRenderDrawColor(renderer, r, g, b, a);
 }
 
 fn target_rect(target: Target) c.SDL_Rect {
@@ -124,13 +136,13 @@ fn update(dt: f32) void {
 }
 
 fn render(renderer: *c.SDL_Renderer) void {
-    _ = c.SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
+    set_color(renderer, PROJ_COLOR);
     _ = c.SDL_RenderFillRect(renderer, &proj_rect(proj_x, proj_y));
 
-    _ = c.SDL_SetRenderDrawColor(renderer, 0xFF, 0, 0, 0xFF);
+    set_color(renderer, BAR_COLOR);
     _ = c.SDL_RenderFillRect(renderer, &bar_rect());
 
-    _ = c.SDL_SetRenderDrawColor(renderer, 0, 0xFF, 0, 0xFF);
+    set_color(renderer, TARGET_COLOR);
     for (targets_pool) |target| {
         if (!target.dead) {
             _ = c.SDL_RenderFillRect(renderer, &target_rect(target));
@@ -192,7 +204,7 @@ pub fn main() !void {
 
         update(DELTA_TIME_SEC);
 
-        _ = c.SDL_SetRenderDrawColor(renderer, 0x18, 0x18, 0x18, 0xFF);
+        set_color(renderer, BACKGROUND_COLOR);
         _ = c.SDL_RenderClear(renderer);
 
         render(renderer);
