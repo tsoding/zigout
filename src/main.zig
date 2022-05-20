@@ -8,16 +8,21 @@ const FPS: comptime_int = 60;
 const DELTA_TIME_SEC: f32 = 1.0/@intToFloat(f32, FPS);
 const WINDOW_WIDTH: comptime_int = 800;
 const WINDOW_HEIGHT: comptime_int = 600;
-const PROJ_SIZE: f32 = 25;
+const PROJ_SIZE: f32 = 25*0.80;
 const PROJ_SPEED: f32 = 500;
 const BAR_LEN: f32 = 100;
 const BAR_THICCNESS: f32 = PROJ_SIZE;
-const BAR_Y: f32 = WINDOW_HEIGHT - BAR_THICCNESS - 100;
-const BAR_SPEED: f32 = PROJ_SPEED;
+const BAR_Y: f32 = WINDOW_HEIGHT - BAR_THICCNESS - 50;
+const BAR_SPEED: f32 = PROJ_SPEED*1.5;
 const TARGET_WIDTH = BAR_LEN;
 const TARGET_HEIGHT = BAR_THICCNESS;
-const TARGET_PADDING = 20;
-const TARGETS_CAP = 128;
+const TARGET_PADDING_X = 20;
+const TARGET_PADDING_Y = 50;
+const TARGET_ROWS = 4;
+const TARGET_COLS = 5;
+const TARGET_GRID_WIDTH = (TARGET_COLS*TARGET_WIDTH + (TARGET_COLS - 1)*TARGET_PADDING_X);
+const TARGET_GRID_X = WINDOW_WIDTH/2 - TARGET_GRID_WIDTH/2;
+const TARGET_GRID_Y = 50;
 
 const Target = struct {
     x: f32,
@@ -25,32 +30,22 @@ const Target = struct {
     dead: bool = false,
 };
 
-var targets_pool = [_]Target{
-    Target { .x = 100, .y = 100 },
-    Target { .x = 100 + TARGET_WIDTH + TARGET_PADDING, .y = 100 },
-    Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*2, .y = 100 },
-    Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*3, .y = 100 },
-    Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*4, .y = 100 },
+fn init_targets() [TARGET_ROWS*TARGET_COLS]Target {
+    var targets: [TARGET_ROWS*TARGET_COLS]Target = undefined;
+    var row: usize = 0;
+    while (row < TARGET_ROWS) : (row += 1) {
+        var col: usize = 0;
+        while (col < TARGET_COLS) : (col += 1) {
+            targets[row*TARGET_COLS + col] = Target {
+                .x = TARGET_GRID_X + (TARGET_WIDTH + TARGET_PADDING_X)*@intToFloat(f32, col),
+                .y = TARGET_GRID_Y + TARGET_PADDING_Y*@intToFloat(f32, row)
+            };
+        }
+    }
+    return targets;
+}
 
-    Target { .x = 100, .y = 150 },
-    Target { .x = 100 + TARGET_WIDTH + TARGET_PADDING, .y = 150 },
-    Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*2, .y = 150 },
-    Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*3, .y = 150 },
-    Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*4, .y = 150 },
-
-    Target { .x = 100, .y = 200 },
-    Target { .x = 100 + TARGET_WIDTH + TARGET_PADDING, .y = 200 },
-    Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*2, .y = 200 },
-    Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*3, .y = 200 },
-    Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*4, .y = 200 },
-
-    Target { .x = 100, .y = 250 },
-    Target { .x = 100 + TARGET_WIDTH + TARGET_PADDING, .y = 250 },
-    Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*2, .y = 250 },
-    Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*3, .y = 250 },
-    Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*4, .y = 250 },
-};
-
+var targets_pool = init_targets();
 var quit = false;
 var bar_x:   f32 = WINDOW_WIDTH/2 - BAR_LEN/2;
 var bar_dx:  f32 = 0;
@@ -83,15 +78,17 @@ fn bar_rect() c.SDL_Rect {
 }
 
 fn update(dt: f32) void {
+    const overlaps = c.SDL_HasIntersection;
+
     if (!pause and started) {
         bar_x = math.clamp(bar_x + bar_dx*BAR_SPEED*dt, 0, WINDOW_WIDTH - BAR_LEN);
 
         var proj_nx = proj_x + proj_dx*PROJ_SPEED*dt;
-        var cond_x = proj_nx < 0 or proj_nx + PROJ_SIZE > WINDOW_WIDTH or c.SDL_HasIntersection(&proj_rect(proj_nx, proj_y), &bar_rect()) != 0;
+        var cond_x = proj_nx < 0 or proj_nx + PROJ_SIZE > WINDOW_WIDTH or overlaps(&proj_rect(proj_nx, proj_y), &bar_rect()) != 0;
         for (targets_pool) |*target| {
             if (cond_x) break;
             if (!target.dead) {
-                cond_x = cond_x or c.SDL_HasIntersection(&proj_rect(proj_nx, proj_y), &target_rect(target.*)) != 0;
+                cond_x = cond_x or overlaps(&proj_rect(proj_nx, proj_y), &target_rect(target.*)) != 0;
                 if (cond_x) target.dead = true;
             }
         }
@@ -104,15 +101,13 @@ fn update(dt: f32) void {
         var proj_ny = proj_y + proj_dy*PROJ_SPEED*dt;
         var cond_y = (proj_ny < 0 or proj_ny + PROJ_SIZE > WINDOW_HEIGHT);
         if (!cond_y) {
-            cond_y = cond_y  or c.SDL_HasIntersection(&proj_rect(proj_x, proj_ny), &bar_rect()) != 0;
-            if (cond_y and bar_dx != 0) {
-                proj_dx = bar_dx;
-            }
+            cond_y = cond_y or overlaps(&proj_rect(proj_x, proj_ny), &bar_rect()) != 0;
+            if (cond_y and bar_dx != 0) proj_dx = bar_dx;
         }
         for (targets_pool) |*target| {
             if (cond_y) break;
             if (!target.dead) {
-                cond_y = cond_y or c.SDL_HasIntersection(&proj_rect(proj_x, proj_ny), &target_rect(target.*)) != 0;
+                cond_y = cond_y or overlaps(&proj_rect(proj_x, proj_ny), &target_rect(target.*)) != 0;
                 if (cond_y) target.dead = true;
             }
         }
