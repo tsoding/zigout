@@ -31,6 +31,24 @@ var targets_pool = [_]Target{
     Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*2, .y = 100 },
     Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*3, .y = 100 },
     Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*4, .y = 100 },
+
+    Target { .x = 100, .y = 150 },
+    Target { .x = 100 + TARGET_WIDTH + TARGET_PADDING, .y = 150 },
+    Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*2, .y = 150 },
+    Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*3, .y = 150 },
+    Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*4, .y = 150 },
+
+    Target { .x = 100, .y = 200 },
+    Target { .x = 100 + TARGET_WIDTH + TARGET_PADDING, .y = 200 },
+    Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*2, .y = 200 },
+    Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*3, .y = 200 },
+    Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*4, .y = 200 },
+
+    Target { .x = 100, .y = 250 },
+    Target { .x = 100 + TARGET_WIDTH + TARGET_PADDING, .y = 250 },
+    Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*2, .y = 250 },
+    Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*3, .y = 250 },
+    Target { .x = 100 + (TARGET_WIDTH + TARGET_PADDING)*4, .y = 250 },
 };
 
 var quit = false;
@@ -84,7 +102,13 @@ fn update(dt: f32) void {
         proj_x = proj_nx;
 
         var proj_ny = proj_y + proj_dy*PROJ_SPEED*dt;
-        var cond_y = (proj_ny < 0 or proj_ny + PROJ_SIZE > WINDOW_HEIGHT or c.SDL_HasIntersection(&proj_rect(proj_x, proj_ny), &bar_rect()) != 0);
+        var cond_y = (proj_ny < 0 or proj_ny + PROJ_SIZE > WINDOW_HEIGHT);
+        if (!cond_y) {
+            cond_y = cond_y  or c.SDL_HasIntersection(&proj_rect(proj_x, proj_ny), &bar_rect()) != 0;
+            if (cond_y and bar_dx != 0) {
+                proj_dx = bar_dx;
+            }
+        }
         for (targets_pool) |*target| {
             if (cond_y) break;
             if (!target.dead) {
@@ -154,11 +178,17 @@ pub fn main() !void {
         bar_dx = 0;
         if (keyboard[c.SDL_SCANCODE_A] != 0) {
             bar_dx += -1;
-            started = true;
+            if (!started) {
+                started = true;
+                proj_dx = -1;
+            }
         }
         if (keyboard[c.SDL_SCANCODE_D] != 0) {
             bar_dx += 1;
-            started = true;
+            if (!started) {
+                started = true;
+                proj_dx = 1;
+            }
         }
 
         update(DELTA_TIME_SEC);
