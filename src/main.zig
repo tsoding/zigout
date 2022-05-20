@@ -61,6 +61,7 @@ var pause = false;
 var started = false;
 // TODO: death
 // TODO: score
+// TODO: victory
 
 fn make_rect(x: f32, y: f32, w: f32, h: f32) c.SDL_Rect {
     return c.SDL_Rect {
