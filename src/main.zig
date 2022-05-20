@@ -23,10 +23,10 @@ var bar_x:   f32 = 0;
 var bar_dx:  f32 = 0;
 var pause = false;
 
-fn proj_rect() c.SDL_Rect {
+fn proj_rect(x: f32, y: f32) c.SDL_Rect {
     const rect = c.SDL_Rect {
-        .x = @floatToInt(i32, proj_x),
-        .y = @floatToInt(i32, proj_y),
+        .x = @floatToInt(i32, x),
+        .y = @floatToInt(i32, y),
         .w = PROJ_SIZE,
         .h = PROJ_SIZE
     };
@@ -48,30 +48,24 @@ fn update(dt: f32) void {
         bar_x += bar_dx*BAR_SPEED*dt;
 
         var proj_nx = proj_x + proj_dx*PROJ_SPEED*dt;
-        if (proj_nx < 0 or proj_nx + PROJ_SIZE > WINDOW_WIDTH) {
+        if (proj_nx < 0 or proj_nx + PROJ_SIZE > WINDOW_WIDTH or c.SDL_HasIntersection(&proj_rect(proj_nx, proj_y), &bar_rect()) != 0) {
             proj_dx *= -1;
             proj_nx = proj_x + proj_dx*PROJ_SPEED*dt;
         }
+        proj_x = proj_nx;
 
         var proj_ny = proj_y + proj_dy*PROJ_SPEED*dt;
-        if (proj_ny < 0 or proj_ny + PROJ_SIZE > WINDOW_HEIGHT) {
+        if (proj_ny < 0 or proj_ny + PROJ_SIZE > WINDOW_HEIGHT or c.SDL_HasIntersection(&proj_rect(proj_x, proj_ny), &bar_rect()) != 0) {
             proj_dy *= -1;
             proj_ny = proj_y + proj_dy*PROJ_SPEED*dt;
         }
-
-        if (c.SDL_HasIntersection(&proj_rect(), &bar_rect()) != 0) {
-            proj_dy *= -1;
-            proj_ny = proj_y + proj_dy*PROJ_SPEED*dt;            
-        }
-
-        proj_x = proj_nx;
         proj_y = proj_ny;
     }
 }
 
 fn render(renderer: *c.SDL_Renderer) void {
     _ = c.SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
-    _ = c.SDL_RenderFillRect(renderer, &proj_rect());
+    _ = c.SDL_RenderFillRect(renderer, &proj_rect(proj_x, proj_y));
 
     _ = c.SDL_SetRenderDrawColor(renderer, 0xFF, 0, 0, 0xFF);
     _ = c.SDL_RenderFillRect(renderer, &bar_rect());
