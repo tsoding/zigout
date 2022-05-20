@@ -4,12 +4,12 @@ const c = @cImport({
     @cInclude("SDL2/SDL.h");
 });
 
-const FPS: comptime_int = 60;
+const FPS = 60;
 const DELTA_TIME_SEC: f32 = 1.0/@intToFloat(f32, FPS);
-const WINDOW_WIDTH: comptime_int = 800;
-const WINDOW_HEIGHT: comptime_int = 600;
+const WINDOW_WIDTH = 800;
+const WINDOW_HEIGHT = 600;
 const PROJ_SIZE: f32 = 25*0.80;
-const PROJ_SPEED: f32 = 500;
+const PROJ_SPEED: f32 = 400;
 const BAR_LEN: f32 = 100;
 const BAR_THICCNESS: f32 = PROJ_SIZE;
 const BAR_Y: f32 = WINDOW_HEIGHT - BAR_THICCNESS - 50;
@@ -46,15 +46,17 @@ fn init_targets() [TARGET_ROWS*TARGET_COLS]Target {
 }
 
 var targets_pool = init_targets();
-var quit = false;
 var bar_x:   f32 = WINDOW_WIDTH/2 - BAR_LEN/2;
 var bar_dx:  f32 = 0;
 var proj_x:  f32 = WINDOW_WIDTH/2 - PROJ_SIZE/2;
 var proj_y:  f32 = BAR_Y - BAR_THICCNESS/2 - PROJ_SIZE;
 var proj_dx: f32 = 1;
 var proj_dy: f32 = 1;
+var quit = false;
 var pause = false;
 var started = false;
+// TODO: death
+// TODO: score
 
 fn make_rect(x: f32, y: f32, w: f32, h: f32) c.SDL_Rect {
     return c.SDL_Rect {
@@ -84,7 +86,9 @@ fn update(dt: f32) void {
         bar_x = math.clamp(bar_x + bar_dx*BAR_SPEED*dt, 0, WINDOW_WIDTH - BAR_LEN);
 
         var proj_nx = proj_x + proj_dx*PROJ_SPEED*dt;
-        var cond_x = proj_nx < 0 or proj_nx + PROJ_SIZE > WINDOW_WIDTH or overlaps(&proj_rect(proj_nx, proj_y), &bar_rect()) != 0;
+        var cond_x = proj_nx < 0 or
+            proj_nx + PROJ_SIZE > WINDOW_WIDTH or
+            overlaps(&proj_rect(proj_nx, proj_y), &bar_rect()) != 0;
         for (targets_pool) |*target| {
             if (cond_x) break;
             if (!target.dead) {
@@ -99,7 +103,7 @@ fn update(dt: f32) void {
         proj_x = proj_nx;
 
         var proj_ny = proj_y + proj_dy*PROJ_SPEED*dt;
-        var cond_y = (proj_ny < 0 or proj_ny + PROJ_SIZE > WINDOW_HEIGHT);
+        var cond_y = proj_ny < 0 or proj_ny + PROJ_SIZE > WINDOW_HEIGHT;
         if (!cond_y) {
             cond_y = cond_y or overlaps(&proj_rect(proj_x, proj_ny), &bar_rect()) != 0;
             if (cond_y and bar_dx != 0) proj_dx = bar_dx;
