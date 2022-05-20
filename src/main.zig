@@ -1,4 +1,5 @@
 const std = @import("std");
+const math = std.math;
 const c = @cImport({
     @cInclude("SDL2/SDL.h");
 });
@@ -45,7 +46,7 @@ fn bar_rect() c.SDL_Rect {
 
 fn update(dt: f32) void {
     if (!pause) {
-        bar_x += bar_dx*BAR_SPEED*dt;
+        bar_x = math.clamp(bar_x + bar_dx*BAR_SPEED*dt, 0, WINDOW_WIDTH - BAR_LEN);
 
         var proj_nx = proj_x + proj_dx*PROJ_SPEED*dt;
         if (proj_nx < 0 or proj_nx + PROJ_SIZE > WINDOW_WIDTH or c.SDL_HasIntersection(&proj_rect(proj_nx, proj_y), &bar_rect()) != 0) {
