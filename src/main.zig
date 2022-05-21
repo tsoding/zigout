@@ -3,6 +3,7 @@ const math = std.math;
 const c = @cImport({
     @cInclude("SDL2/SDL.h");
 });
+const overlaps = c.SDL_HasIntersection;
 
 const FPS = 60;
 const DELTA_TIME_SEC: f32 = 1.0/@intToFloat(f32, FPS);
@@ -13,12 +14,12 @@ const PROJ_SIZE: f32 = 25*0.80;
 const PROJ_SPEED: f32 = 350;
 const PROJ_COLOR = 0xFFFFFFFF;
 const BAR_LEN: f32 = 100;
-const BAR_THICCNESS: f32 = PROJ_SIZE;
-const BAR_Y: f32 = WINDOW_HEIGHT - BAR_THICCNESS - 50;
+const BAR_THICCNESS: f32 = 100;//PROJ_SIZE;
+const BAR_Y: f32 = WINDOW_HEIGHT - PROJ_SIZE - 50;
 const BAR_SPEED: f32 = PROJ_SPEED*1.5;
 const BAR_COLOR = 0xFF3030FF;
 const TARGET_WIDTH = BAR_LEN;
-const TARGET_HEIGHT = BAR_THICCNESS;
+const TARGET_HEIGHT = PROJ_SIZE;
 const TARGET_PADDING_X = 20;
 const TARGET_PADDING_Y = 50;
 const TARGET_ROWS = 4;
@@ -88,51 +89,62 @@ fn proj_rect(x: f32, y: f32) c.SDL_Rect {
     return make_rect(x, y, PROJ_SIZE, PROJ_SIZE);
 }
 
-fn bar_rect() c.SDL_Rect {
-    return make_rect(bar_x, BAR_Y - BAR_THICCNESS/2, BAR_LEN, BAR_THICCNESS);
+fn bar_rect(x: f32) c.SDL_Rect {
+    return make_rect(x, BAR_Y - BAR_THICCNESS/2, BAR_LEN, BAR_THICCNESS);
+}
+
+fn horz_collision(dt: f32) void {
+    var proj_nx: f32 = proj_x + proj_dx*PROJ_SPEED*dt;
+    if (proj_nx < 0 or proj_nx + PROJ_SIZE > WINDOW_WIDTH or overlaps(&proj_rect(proj_nx, proj_y), &bar_rect(bar_x)) != 0) {
+        proj_dx *= -1;
+        return;
+    }
+    for (targets_pool) |*it| {
+        if (!it.dead and overlaps(&proj_rect(proj_nx, proj_y), &target_rect(it.*)) != 0) {
+            it.dead = true;
+            proj_dx *= -1;
+            return;
+        }
+    }
+    proj_x = proj_nx;
+}
+
+fn vert_collision(dt: f32) void {
+    var proj_ny: f32 = proj_y + proj_dy*PROJ_SPEED*dt;
+    if (proj_ny < 0 or proj_ny + PROJ_SIZE > WINDOW_HEIGHT) {
+        proj_dy *= -1;
+        return;
+    }
+    if (overlaps(&proj_rect(proj_x, proj_ny), &bar_rect(bar_x)) != 0) {
+        if (bar_dx != 0) proj_dx = bar_dx;
+        proj_dy *= -1;
+        return;
+    }
+    for (targets_pool) |*it| {
+        if (!it.dead and overlaps(&proj_rect(proj_x, proj_ny), &target_rect(it.*)) != 0) {
+            it.dead = true;
+            proj_dy *= -1;
+            return;
+        }
+    }
+    proj_y = proj_ny;
+}
+
+fn bar_collision(dt: f32) void {
+    var bar_nx : f32 = math.clamp(bar_x + bar_dx*BAR_SPEED*dt, 0, WINDOW_WIDTH - BAR_LEN);
+    if (overlaps(&proj_rect(proj_x, proj_y), &bar_rect(bar_nx)) != 0) return;
+    bar_x = bar_nx;
 }
 
 fn update(dt: f32) void {
-    const overlaps = c.SDL_HasIntersection;
-
     if (!pause and started) {
-        bar_x = math.clamp(bar_x + bar_dx*BAR_SPEED*dt, 0, WINDOW_WIDTH - BAR_LEN);
-
-        var proj_nx = proj_x + proj_dx*PROJ_SPEED*dt;
-        var cond_x = proj_nx < 0 or
-            proj_nx + PROJ_SIZE > WINDOW_WIDTH or
-            overlaps(&proj_rect(proj_nx, proj_y), &bar_rect()) != 0;
-        for (targets_pool) |*target| {
-            if (cond_x) break;
-            if (!target.dead) {
-                cond_x = cond_x or overlaps(&proj_rect(proj_nx, proj_y), &target_rect(target.*)) != 0;
-                if (cond_x) target.dead = true;
-            }
+        if (overlaps(&proj_rect(proj_x, proj_y), &bar_rect(bar_x)) != 0) {
+            proj_y = BAR_Y - BAR_THICCNESS/2 - PROJ_SIZE - 1.0;
+            return;
         }
-        if (cond_x) {
-            proj_dx *= -1;
-            proj_nx = proj_x + proj_dx*PROJ_SPEED*dt;
-        }
-        proj_x = proj_nx;
-
-        var proj_ny = proj_y + proj_dy*PROJ_SPEED*dt;
-        var cond_y = proj_ny < 0 or proj_ny + PROJ_SIZE > WINDOW_HEIGHT;
-        if (!cond_y) {
-            cond_y = cond_y or overlaps(&proj_rect(proj_x, proj_ny), &bar_rect()) != 0;
-            if (cond_y and bar_dx != 0) proj_dx = bar_dx;
-        }
-        for (targets_pool) |*target| {
-            if (cond_y) break;
-            if (!target.dead) {
-                cond_y = cond_y or overlaps(&proj_rect(proj_x, proj_ny), &target_rect(target.*)) != 0;
-                if (cond_y) target.dead = true;
-            }
-        }
-        if (cond_y) {
-            proj_dy *= -1;
-            proj_ny = proj_y + proj_dy*PROJ_SPEED*dt;
-        }
-        proj_y = proj_ny;
+        bar_collision(dt);
+        horz_collision(dt);
+        vert_collision(dt);
     }
 }
 
@@ -141,7 +153,7 @@ fn render(renderer: *c.SDL_Renderer) void {
     _ = c.SDL_RenderFillRect(renderer, &proj_rect(proj_x, proj_y));
 
     set_color(renderer, BAR_COLOR);
-    _ = c.SDL_RenderFillRect(renderer, &bar_rect());
+    _ = c.SDL_RenderFillRect(renderer, &bar_rect(bar_x));
 
     set_color(renderer, TARGET_COLOR);
     for (targets_pool) |target| {
